@@ -1,98 +1,73 @@
 # Licenser
 
-Command line tool for adding open source licenses to your projects
+Tool for adding open source licenses to your projects
 
 ---
 
-[![PyPI](https://img.shields.io/pypi/v/licenser.svg?maxAge=2592000)]()
-[![PyPI](https://img.shields.io/pypi/pyversions/licenser.svg?maxAge=2592000)]()
-[![Travis](https://img.shields.io/travis/tylucaskelley/licenser.svg?maxAge=2592000)]()
+[![PyPI](https://img.shields.io/pypi/v/licenser.svg?maxAge=3600)](http://pypi.python.org/pypi/licenser)
+[![PyPI](https://img.shields.io/pypi/pyversions/licenser.svg?maxAge=3600)](http://pypi.python.org/pypi/licenser)
+[![Travis](https://travis-ci.org/tylucaskelley/licenser.svg?branch=master)](https://travis-ci.org/tylucaskelley/licenser)
 
 Finding and adding a license to your project is an annoying process,
 and can be quite tedious depending on the license you choose.
 
 Licenser allows you to quickly add a license to your project from
-the command line. Supported licenses as of now include:
+the command line. Supported licenses can be found in the
+[assets folder](https://github.com/tylucaskelley/licenser/tree/master/licenser/assets).
 
-* MIT
-* New BSD
-* GNU GPL v3.0
-* Apache 2.0
-* Mozilla 2.0
+Don't see what you need?
+[Open an issue](https://github.com/tylucaskelley/licenser/issues/new)
+to suggest the addition of other licenses!
+
+### Prerequisites
+
+* Python 2.7 or Python 3.5
 
 ### Installation
 
-First, make sure you have the dependencies:
-
-* A Mac or Linux computer (not tested on Windows)
-* Python (2 or 3)
-* pip
-
-Then, install Licenser:
-
+```bash
     $ pip install licenser
-
-### Basic Usage
-
-It couldn't be simpler:
-
-    $ cd path/to/project
-    $ licenser -l MIT -n "Your name" -e you@example.com -p "Project name"
-
-Boom! You'll now have a copy of the MIT License with your name and year in the root project folder.
-The year will automatically be filled in using the current year. Make sure you enclose your name
-with quotes so the program treats it as one argument.
-
-If you don't want the file extension on your license, just add the "--no" flag at runtime.
-
-### .licenser.json
-
-If you're like me and don't change your name very often, you can save time by creating
-a config file in your home directory.
-
-It needs to look something like this:
-
-```json
-{
-    "name": "Ty-Lucas Kelley",
-    "email": "tylucaskelley@gmail.com",
-    "license": "MIT",
-    "filetypes": {
-        ".java": "//",
-        ".py": "#",
-        ".js": "//"
-    },
-    "ignore": [
-        "node_modules",
-        "lib",
-        "bin",
-        "dist",
-        "Gruntfile.js",
-        ".git"
-    ]
-}
 ```
 
-These defaults can be overridden by using the normal command-line arguments. They're optional,
-but if you want to use a license that recommends prepending your source code files with a header,
-you'll need the `filetypes` object, which contains key-value pairs of file extensions and their
-respective syntax for one-line comments.
+Alternatively, grab the
+[zip](https://github.com/tylucaskelley/licenser/tarball/v2.0.4)!
 
-Leaving out the `filetypes` object will simply mean skipping the step of prepending your code,
-and will result in a warning message upon program exit:
+### Usage
 
-    warning: filetypes object missing from ~/.licenser.json
+From the command line:
 
-To avoid prepending the same source code files more than once (if you call `licenser` multiple times),
-the script will skip any files that contain the commented out project name on the first line. If you
-want to switch licenses, you'll have to manually remove the headers from your source code.
+```bash
+$ licenser -n "Your Name" -e "you@example.com" -l "license name" -p "project name"
+```
 
-The `ignore` array is pretty important too; you don't want to be prepending license headers to
-third-party files, or minified JavaScript code.
+Name, email, and license are the three required parameters; project will default
+to the current directory name if you don't include it.
+
+`--txt` will add the `.txt` extension to the `LICENSE` file.
+
+### Configuration
+
+If you're like me and don't change your name very often, you can save time by
+storing your defaults for name, email, and license in `~/.licenser`:
+
+```bash
+name="Your Name"
+email="you@example.com"
+license="MIT"
+```
 
 ### Contributing
 
-I accept pull requests! There are some potential improvements I've been thinking about:
+I accept [pull requests](https://github.com/tylucaskelley/licenser/compare)!
+There are some potential improvements I've been thinking about:
 
-* Override global `ignore` and `filetypes` settings with a project-specific `.licenserconfig` file
-* Switch to multi-line comments (which will help with supporting CSS and HTML)
+1. Prepending headers to source code files for licenses that recommend it
+2. Pull licenses from an online API (maybe)
+3. Support for more licenses
+
+**Tip**: While working on a feature or bug, you can test your script by running
+`python licenser` from the root project directory.
+
+Additionally, make sure that all tests pass when you add features, and write
+new unit tests if you add a function. Tests can be run using the `nosetests`
+command from the root project directory.

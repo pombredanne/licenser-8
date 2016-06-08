@@ -1,121 +1,181 @@
-#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+'''
+licenser
+========
+
+Tool for adding open source licenses to your projects.
+'''
 
 from argparse import ArgumentParser as parser
 from datetime import date
-import json
 import os
 
-config_file = os.path.expanduser('~/.licenser.json')
-pwd = os.path.dirname(__file__)
-licenses = ['GPL', 'Apache', 'Mozilla', 'MIT', 'BSD']
+cfg = os.path.expanduser('~/.licenser')
+cwd = os.path.dirname(__file__)
+licenses_loc = '/assets/'
 
 
-def __get_defaults():
-    """Return the default options from the ~/.licenser.json file."""
-    if os.path.isfile(config_file):
-        with open(config_file) as f:
-            defaults = json.load(f)
+def compute_distance(a, b):
+    '''
+    Computes the Levenshtein distance between two strings.
+
+    Arguments:
+        - a (str) String to compare to 'b'
+        - b (str) String to compare to 'a'
+
+    Returns:
+        - (int) Number representing closeness of 'a' and 'b' (lower is better)
+    '''
+
+    # check simple cases first
+    if a == b:
+        return 0
+    if not a:
+        return len(b)
+    if not b:
+        return len(a)
+
+    # create empty vectors to store costs
+    vector_1 = [-1] * (len(b) + 1)
+    vector_2 = [-1] * (len(b) + 1)
+
+    # set default values
+    for i in range(len(vector_1)):
+        vector_1[i] = i
+
+    # compute distance
+    for i in range(len(a)):
+        vector_2[0] = i + 1
+
+        for j in range(len(b)):
+            penalty = 0 if a[i] == b[j] else 1
+            vector_2[j + 1] = min(vector_2[j] + 1, vector_1[j + 1] + 1, vector_1[j] + penalty)
+
+        for j in range(len(vector_1)):
+            vector_1[j] = vector_2[j]
+
+    return vector_2[len(b)]
+
+
+def get_defaults(path):
+    '''
+    Reads file for configuration defaults.
+
+    Arguments:
+        - path (str) Absolute filepath (usually ~/.licenser)
+
+    Returns:
+        - (dict) Defaults for name, email, license, .txt extension
+    '''
+
+    defaults = {}
+
+    if os.path.isfile(path):
+        with open(path) as f:
+
+            for line in f:
+                line = line.strip()
+                if '=' not in line or line.startswith('#'):
+                    continue
+
+                k, v = line.split('=', 1)
+                v = v.strip('"').strip("'")
+
+                defaults[k] = v
         return defaults
     else:
         return {}
 
 
-def __get_args(defaults):
-    """Parse command line arguments and merge them with the defaults."""
-    need_name = False if 'name' in defaults else True
-    need_email = False if 'email' in defaults else True
-    need_license = False if 'license' in defaults else True
+def get_license(name):
+    '''
+    Returns the closest match to the requested license.
 
-    p = parser(description='quickly add an open-source license to your project')
+    Arguments:
+        - name (str) License to use
 
-    p.add_argument('-l', dest='license', required=need_license, help='license to add')
-    p.add_argument('-e', dest='email', required=need_email, help='your email address')
-    p.add_argument('-n', dest='name', required=need_name, help='your name')
-    p.add_argument('-p', dest='project', required=True, help='project name')
-    p.add_argument('--no', action='store_true', required=False, help='remove .txt')
+    Returns:
+        - (str) License that most closely matches the 'name' parameter
+    '''
+
+    filenames = os.listdir(cwd + licenses_loc)
+    licenses = dict(zip(filenames, [-1] * len(filenames)))
+
+    for l in licenses:
+        licenses[l] = compute_distance(name, l)
+
+    return min(licenses, key=(lambda k: licenses[k]))
+
+
+def get_args(path):
+    '''
+    Parse command line args & override defaults.
+
+    Arguments:
+        - path (str) Absolute filepath
+
+    Returns:
+        - (tuple) Name, email, license, project, ext, year
+    '''
+
+    defaults = get_defaults(path)
+    licenses = ', '.join(os.listdir(cwd + licenses_loc))
+    p = parser(description='tool for adding open source licenses to your projects. available licenses: %s' % licenses)
+
+    _name = False if defaults.get('name') else True
+    _email = False if defaults.get('email') else True
+    _license = False if defaults.get('license') else True
+
+    p.add_argument('-n', dest='name', required=_name, help='name')
+    p.add_argument('-e', dest='email', required=_email, help='email')
+    p.add_argument('-l', dest='license', required=_license, help='license')
+    p.add_argument('-p', dest='project', required=False, help='project')
+    p.add_argument('--txt', action='store_true', required=False, help='add .txt to filename')
 
     args = p.parse_args()
 
     name = args.name if args.name else defaults.get('name')
     email = args.email if args.email else defaults.get('email')
-    author = name + ' <' + email + '>'
-    license = args.license if args.license else defaults.get('license')
-    project = args.project
+    license = get_license(args.license, licenses_loc=licenses_loc) if args.license else defaults.get('license')
+    project = args.project if args.project else os.getcwd().split('/')[-1]
+    ext = '.txt' if args.txt else ''
     year = str(date.today().year)
-    ext = '' if args.no else '.txt'
 
-    if license not in licenses:
-        p.exit(1, 'fatal: license %s does not exist\n' % license)
-
-    return (author, license, project, year, ext)
+    return (name, email, license, project, ext, year)
 
 
-def __get_license(l):
-    """Grabs the text from the specified license and header files and formats them."""
-    license_file = pwd + '/licenses/' + l
-    license_header = pwd + '/licenses/' + l + '_header'
-    license = None
-    header = None
+def generate_license(args):
+    '''
+    Creates a LICENSE or LICENSE.txt file in the current directory. Reads from
+    the 'assets' folder and looks for placeholders enclosed in curly braces.
 
-    if os.path.isfile(license_file):
-        with open(license_file) as f:
-            license = f.read()
-    if os.path.isfile(license_header):
-        with open(license_header) as f:
-            header = f.read()
+    Arguments:
+        - (tuple) Name, email, license, project, ext, year
+    '''
 
-    return (license, header)
+    with open(cwd + licenses_loc + args[2]) as f:
+        license = f.read()
 
+    license = license.format(name=args[0],
+                             email=args[1],
+                             license=args[2],
+                             project=args[3],
+                             year=args[5])
 
-def __add_header(src_file, header, comment):
-    """Prepends a license header to a file."""
-    commented_header = [''.join([comment, ' ', s, '\n']) for s in header.split('\n')]
-    commented_header[-1] = '\n'
-
-    with open(src_file, 'r') as f:
-        file_lines = commented_header + f.readlines()
-
-    with open(src_file, 'w') as f:
-        f.writelines(file_lines)
-
-
-def add_license():
-    """Add a license to a file."""
-    defaults = __get_defaults()
-    author, license_name, project, year, ext = __get_args(defaults)
-    license, header = __get_license(license_name)
-
-    license = license.format(author=author, year=year, project=project)
-
-    with open('LICENSE' + ext, 'w') as f:
+    with open('LICENSE' + args[4], 'w') as f:
         f.write(license)
+        print('licenser: license file added to current directory')
 
-    if header:
-        if 'filetypes' not in defaults:
-            print("warning: filetypes object missing from ~/.licenser.json")
-        else:
-            header = header.format(author=author, year=year, project=project)
-            filetypes = defaults.get('filetypes')
-            exts = tuple(filetypes.keys())
 
-            for root, dirs, files in os.walk(os.getcwd(), topdown=True):
-                ignore = True if 'ignore' in defaults else False
+def main():
+    '''
+    Gets arguments and generates a LICENSE file.
+    '''
 
-                if ignore:
-                    files = [f for f in files if f not in defaults['ignore']]
-                    dirs[:] = [d for d in dirs if d not in defaults['ignore']]
-
-                for f in files:
-                    if f.endswith(exts):
-                            src_file = os.path.join(root, f)
-                            comment = filetypes.get(os.path.splitext(src_file)[1])
-
-                            with open(src_file) as src:
-                                first_line = src.readline()
-
-                            if comment + ' ' + project not in first_line:
-                                __add_header(src_file, header, comment)
+    args = get_args(cfg)
+    generate_license(args)
 
 
 if __name__ == '__main__':
-    add_license()
+    main()

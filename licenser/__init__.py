@@ -1,5 +1,12 @@
-import licenser
+# -*- coding: utf-8 -*-
 
+'''
+licenser
+========
 
-def main():
-    licenser.add_license()
+Tool for adding open source licenses to your projects
+'''
+
+__copyright__ = 'Copyright (c) 2016 Ty-Lucas Kelley'
+__license__ = 'MIT License (see LICENSE)'
+__title__ = 'licenser'
